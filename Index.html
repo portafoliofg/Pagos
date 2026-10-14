@@ -10,112 +10,317 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root {
-    --bg: #f6f7f9; --card: #ffffff; --text: #1d2330; --muted: #646d7e;
-    --border: #d9dde4; --accent: #1a5fd0; --accent-text: #ffffff;
-    --ok: #1f7a3d; --error: #b00020; --th: #eef1f5;
+    --bg: #eef1f6;
+    --surface: #ffffff;
+    --surface-soft: #f4f6fa;
+    --border: #dbe1ea;
+    --text: #1a2233;
+    --muted: #677085;
+    --sidebar: #16213b;
+    --sidebar-text: #aab4c8;
+    --sidebar-text-active: #ffffff;
+    --primary: #2451a3;
+    --primary-dark: #173769;
+    --accent: #2e9e6b;
+    --accent-soft: #e2f5ec;
+    --warning: #c98a1f;
+    --warning-soft: #fbf0dc;
+    --danger: #c44536;
+    --danger-soft: #fae3e0;
+    --shadow: 0 1px 2px rgba(22, 33, 59, 0.05), 0 6px 20px rgba(22, 33, 59, 0.07);
+    --radius: 14px;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #14171c; --card: #1d2128; --text: #e6e9ee; --muted: #9aa3b2;
-      --border: #343a45; --accent: #5b93f0; --accent-text: #0e1116;
-      --ok: #5cc581; --error: #ff6b81; --th: #262b34;
+      --bg: #0f1420;
+      --surface: #161d2e;
+      --surface-soft: #1d2538;
+      --border: #2b3550;
+      --text: #e7ebf5;
+      --muted: #8d97b0;
+      --sidebar: #0a0e18;
+      --sidebar-text: #7e88a3;
+      --sidebar-text-active: #ffffff;
+      --primary: #5b8fe0;
+      --primary-dark: #3a6bc2;
+      --accent: #4bbf8c;
+      --accent-soft: #163327;
+      --warning: #d9a53f;
+      --warning-soft: #332a14;
+      --danger: #e2685a;
+      --danger-soft: #3a1e1c;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
     }
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text);
-         font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif; }
-  main { max-width: 900px; margin: 0 auto; padding: 20px 16px 60px; }
-  h1 { font-size: 1.6rem; margin: 0 0 4px; }
-  .sub { color: var(--muted); margin: 0 0 20px; }
-  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
-          padding: 16px; margin-bottom: 16px; }
-  .row { display: flex; flex-wrap: wrap; gap: 12px; }
-  .row > label { flex: 1 1 200px; }
-  label { display: block; font-weight: 600; font-size: .9rem; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+  .app { display: flex; min-height: 100vh; }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--sidebar);
+    color: var(--sidebar-text);
+    padding: 20px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #fff;
+    padding: 0 8px 20px;
+    font-weight: 700;
+    font-size: 1.02rem;
+  }
+  .brand svg { flex-shrink: 0; }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: .92rem;
+    font-weight: 600;
+    background: none;
+    border: none;
+    color: inherit;
+    text-align: left;
+    width: 100%;
+  }
+  .nav-item:hover { background: rgba(255,255,255,0.06); }
+  .nav-item.active { background: var(--primary); color: var(--sidebar-text-active); }
+  .nav-item svg { flex-shrink: 0; opacity: .9; }
+
+  /* ---------- Main ---------- */
+  main { flex: 1; padding: 28px 32px 60px; max-width: 1100px; }
+  .view { display: none; }
+  .view.active { display: block; }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 22px; font-size: .92rem; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 20px;
+    margin-bottom: 18px;
+  }
+  .row { display: flex; flex-wrap: wrap; gap: 14px; }
+  .row > label { flex: 1 1 180px; }
+  label { display: block; font-weight: 600; font-size: .85rem; color: var(--muted); }
   select, input[type=file] {
-    display: block; width: 100%; margin-top: 4px; padding: 8px; font: inherit;
-    background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; }
-  .drop { margin-top: 12px; }
-  button { font: inherit; padding: 9px 16px; border-radius: 6px; border: 1px solid var(--accent);
-           background: var(--accent); color: var(--accent-text); cursor: pointer; font-weight: 600; }
-  button.secondary { background: transparent; color: var(--accent); }
+    display: block; width: 100%; margin-top: 6px; padding: 9px 10px; font: inherit;
+    background: var(--surface-soft); color: var(--text); border: 1px solid var(--border);
+    border-radius: 9px;
+  }
+  .drop { margin-top: 14px; }
+  button {
+    font: inherit; padding: 10px 18px; border-radius: 9px; border: 1px solid var(--primary);
+    background: var(--primary); color: #fff; cursor: pointer; font-weight: 600;
+    transition: transform .05s ease, background .15s ease;
+  }
+  button:hover { background: var(--primary-dark); }
+  button:active { transform: translateY(1px); }
+  button.secondary { background: transparent; color: var(--primary); }
+  button.secondary:hover { background: var(--surface-soft); }
   button:disabled { opacity: .5; cursor: not-allowed; }
-  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-  .hint { color: var(--muted); font-size: .85rem; margin: 6px 0 0; }
-  #status { margin: 10px 0 0; color: var(--muted); min-height: 1.2em; }
-  .msg-ok { color: var(--ok); } .msg-error { color: var(--error); }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .hint { color: var(--muted); font-size: .85rem; margin: 8px 0 0; }
+  #status { margin: 10px 0 0; color: var(--muted); min-height: 1.2em; font-size: .9rem; }
+  .msg-ok { color: var(--accent); } .msg-error { color: var(--danger); }
+  .warn {
+    color: var(--warning); background: var(--warning-soft); border-radius: 9px;
+    padding: 8px 12px; font-size: .85rem; margin: 10px 0;
+  }
+
   .file-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-  .file-head h3 { margin: 0; font-size: 1.05rem; word-break: break-all; }
-  .badge { font-size: .8rem; padding: 2px 8px; border-radius: 99px; border: 1px solid currentColor; }
-  table { border-collapse: collapse; width: 100%; margin-top: 10px; }
-  th, td { border: 1px solid var(--border); padding: 6px 8px; text-align: left; vertical-align: middle; }
-  th { background: var(--th); }
-  td:first-child { width: 38%; }
-  td input { width: 100%; border: none; background: transparent; color: var(--text); font: inherit; padding: 2px; }
-  td input:focus { outline: 2px solid var(--accent); border-radius: 3px; }
-  details summary { cursor: pointer; font-weight: 600; }
-  pre { white-space: pre-wrap; font-size: .8rem; background: var(--bg); padding: 8px; border-radius: 6px; }
-  .warn { color: var(--error); font-size: .85rem; margin: 6px 0 10px; }
+  .file-head h3 { margin: 0; font-size: 1rem; word-break: break-all; }
+  .badge {
+    font-size: .74rem; font-weight: 700; padding: 3px 10px; border-radius: 99px;
+    text-transform: uppercase; letter-spacing: .03em;
+  }
+  .badge-pendiente { background: var(--warning-soft); color: var(--warning); }
+  .badge-guardado { background: var(--accent-soft); color: var(--accent); }
+  .badge-error { background: var(--danger-soft); color: var(--danger); }
+  .badge-texto { background: var(--surface-soft); color: var(--muted); border: 1px solid var(--border); }
+
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin-top: 10px; font-size: .88rem; }
+  th, td { border: 1px solid var(--border); padding: 7px 10px; text-align: left; vertical-align: middle; }
+  th { background: var(--surface-soft); font-size: .78rem; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); }
+  td:first-child { width: 34%; }
+  td input {
+    width: 100%; border: none; background: transparent; color: var(--text); font: inherit; padding: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  td input:focus { outline: 2px solid var(--primary); border-radius: 4px; }
+  td input:disabled { color: var(--muted); }
+  details summary { cursor: pointer; font-weight: 600; font-size: .85rem; color: var(--muted); }
+  pre { white-space: pre-wrap; font-size: .78rem; background: var(--surface-soft); padding: 10px; border-radius: 8px; }
+
+  /* ---------- Vistas agrupadas (Transferencias / Cheques) ---------- */
+  .group-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .banco-group { margin-bottom: 22px; }
+  .banco-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 2px 2px 10px; border-bottom: 2px solid var(--primary);
+    margin-bottom: 14px;
+  }
+  .banco-head h2 { margin: 0; font-size: 1.15rem; }
+  .banco-head .total { color: var(--muted); font-size: .85rem; }
+  .sub-group { margin-bottom: 14px; }
+  .sub-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-weight: 700; font-size: .92rem; margin-bottom: 6px;
+  }
+  .sub-head .count { color: var(--muted); font-weight: 500; font-size: .82rem; }
+  .empty-state { text-align: center; color: var(--muted); padding: 40px 10px; }
+  .empty-state svg { opacity: .5; margin-bottom: 10px; }
+
+  html, body { overflow-x: hidden; }
+
+  @media (max-width: 760px) {
+    .app { flex-direction: column; }
+    .sidebar {
+      width: 100%; flex-direction: row; overflow-x: auto; padding: 12px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .nav-item { white-space: nowrap; flex-shrink: 0; }
+    .brand { display: none; }
+    main { padding: 20px 16px 48px; max-width: 100%; }
+  }
 </style>
 </head>
 <body>
-<main>
-  <h1>Lector de comprobantes</h1>
-  <p class="sub">Subí comprobantes (foto o PDF), revisá los datos y guardalos en la hoja.</p>
-
-  <section class="card">
-    <div class="row">
-      <label>Banco
-        <select id="banco">
-          <option>BBVA</option>
-          <option>Bancor</option>
-        </select>
-      </label>
-      <label>Operación
-        <select id="operacion">
-          <option>Efectivo</option>
-          <option selected>Transferencias</option>
-          <option>Cheques emitidos</option>
-          <option>Cheques de terceros</option>
-          <option>FCI</option>
-        </select>
-      </label>
+<div class="app">
+  <nav class="sidebar">
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 7L12 3L20 7V9H4V7Z" fill="currentColor"/><path d="M5 10H7V18H5V10ZM11 10H13V18H11V10ZM17 10H19V18H17V10Z" fill="currentColor"/><path d="M3 19H21V21H3V19Z" fill="currentColor"/></svg>
+      Lector de comprobantes
     </div>
-    <p class="hint">Por ahora la extracción automática de datos solo está implementada para
-      <strong>BBVA + Transferencias</strong>. Con otras combinaciones el comprobante se puede
-      revisar (se muestra el texto leído), pero no se guarda en la hoja.</p>
-    <label class="drop">Archivos (imagen o PDF) — podés elegir varios
-      <input type="file" id="files" accept=".jpg,.jpeg,.png,.pdf" multiple>
-    </label>
-    <div class="actions">
-      <button id="btnProcesar">Procesar</button>
-    </div>
-    <p id="status"></p>
-  </section>
+    <button class="nav-item active" data-vista="cargar" type="button">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 15V4M12 4L7 9M12 4L17 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 15V18C4 19.1 4.9 20 6 20H18C19.1 20 20 19.1 20 18V15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      Cargar
+    </button>
+    <button class="nav-item" data-vista="transferencias" type="button">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 10L7 6L11 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 6V18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M21 14L17 18L13 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 18V6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      Transferencias
+    </button>
+    <button class="nav-item" data-vista="cheques" type="button">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="6" width="18" height="12" rx="2" stroke="currentColor" stroke-width="2"/><path d="M7 15H11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16.5" cy="15" r="1.5" fill="currentColor"/></svg>
+      Cheques
+    </button>
+  </nav>
 
-  <section id="resultsSection" hidden>
-    <div class="card">
-      <strong>Resultados</strong>
-      <p class="hint">Podés corregir cualquier valor antes de guardarlo.</p>
-      <div class="actions">
-        <button id="btnGuardar">Guardar en la hoja</button>
-        <button id="btnLimpiar" class="secondary">Limpiar</button>
+  <main>
+    <!-- ===================== VISTA: CARGAR ===================== -->
+    <section id="vista-cargar" class="view active">
+      <h1>Cargar comprobantes</h1>
+      <p class="sub">Subí comprobantes (foto o PDF), revisá los datos y guardalos.</p>
+
+      <div class="card">
+        <div class="row">
+          <label>Banco
+            <select id="banco">
+              <option>BBVA</option>
+              <option>Bancor</option>
+            </select>
+          </label>
+          <label>Tipo de comprobante
+            <select id="tipo">
+              <option selected>Transferencia</option>
+              <option>Cheque emitido</option>
+              <option>Cheque de terceros</option>
+              <option>Efectivo</option>
+              <option>FCI</option>
+            </select>
+          </label>
+        </div>
+        <p class="hint">Extracción automática implementada hoy: <strong>BBVA + Transferencia</strong>.
+          El resto se puede revisar (se muestra el texto leído) pero todavía no se guarda solo.</p>
+        <label class="drop">Archivos (imagen o PDF) — podés elegir varios
+          <input type="file" id="files" accept=".jpg,.jpeg,.png,.pdf" multiple>
+        </label>
+        <div class="actions">
+          <button id="btnProcesar">Procesar</button>
+        </div>
+        <p id="status"></p>
       </div>
-      <p id="saveStatus"></p>
-    </div>
-    <div id="results"></div>
-  </section>
-</main>
+
+      <section id="resultsSection" hidden>
+        <div class="card">
+          <strong>Resultados</strong>
+          <p class="hint">Podés corregir cualquier valor antes de guardarlo.</p>
+          <div class="actions">
+            <button id="btnGuardar">Guardar</button>
+            <button id="btnLimpiar" class="secondary">Limpiar</button>
+          </div>
+          <p id="saveStatus"></p>
+        </div>
+        <div id="results"></div>
+      </section>
+    </section>
+
+    <!-- ===================== VISTA: TRANSFERENCIAS ===================== -->
+    <section id="vista-transferencias" class="view">
+      <div class="group-toolbar">
+        <div>
+          <h1>Transferencias</h1>
+          <p class="sub" style="margin-bottom:0">Agrupadas por banco y, dentro de cada banco, por destinatario.</p>
+        </div>
+        <button id="btnRefrescarTransferencias" class="secondary" type="button">Actualizar</button>
+      </div>
+      <div id="transferenciasBox"></div>
+    </section>
+
+    <!-- ===================== VISTA: CHEQUES ===================== -->
+    <section id="vista-cheques" class="view">
+      <div class="group-toolbar">
+        <div>
+          <h1>Cheques</h1>
+          <p class="sub" style="margin-bottom:0">Agrupados por banco y por tipo (emitido / de terceros).</p>
+        </div>
+        <button id="btnRefrescarCheques" class="secondary" type="button">Actualizar</button>
+      </div>
+      <div id="chequesBox"></div>
+    </section>
+  </main>
+</div>
 
 <script>
-// ---------------- Configuración ----------------
-const KEYS = [
-  "Cuenta Origen", "N° de Referencia", "Titular Origen", "CUIT Origen", "Fecha", "Hora",
-  "Cuenta Destino / CBU", "Titular Destino", "CUIT Destino", "Importe", "Motivo", "Concepto"
+// ---------------- Esquema (debe reflejar los HEADERS_* de Code.gs) ----------------
+const HEADERS_TRANSFERENCIAS = [
+  "Archivo", "Banco", "Cuenta Origen", "N° de Referencia", "Titular Origen", "CUIT Origen",
+  "Fecha", "Hora", "Cuenta Destino / CBU", "Titular Destino", "CUIT Destino",
+  "Importe", "Motivo", "Concepto"
+];
+const HEADERS_CHEQUES = [
+  "Archivo", "Banco", "Tipo", "N° de Cheque", "Titular", "CUIT",
+  "Fecha de Emisión", "Fecha de Pago", "Importe", "Concepto"
 ];
 
-pdfjsLib.GlobalWorkerOptions.workerSrc =
-  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+// Si pdf.js no llegó a cargar (red, bloqueador, etc.) esto no debe cortar
+// el resto del script: sin esto, ni el menú ni el botón de procesar
+// llegarían a engancharse. El error real (no se puede leer un PDF) va a
+// aparecer igual, pero contenido al intentar procesar ese archivo puntual.
+if (typeof pdfjsLib !== "undefined") {
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+} else {
+  console.warn("pdf.js no cargó: la lectura de archivos PDF no va a funcionar, pero el resto de la app sigue andando.");
+}
 
 // ---------------- OCR ----------------
 let ocrWorker = null;
@@ -189,7 +394,7 @@ async function ocrFromFile(file) {
   return text;
 }
 
-// ---------------- Extracción de campos ----------------
+// ---------------- Extracción: Transferencias BBVA ----------------
 // Búsqueda de respaldo: se usa solo para completar campos que las pasadas
 // con etiqueta (parseBbvaTransferencias) no encontraron. Busca el PRIMER
 // patrón que matchea en todo el texto, así que si el comprobante tiene más
@@ -212,7 +417,9 @@ function cleanTrailingFecha(v) {
 }
 
 function parseBbvaTransferencias(text) {
-  const c = Object.fromEntries(KEYS.map(k => [k, ""]));
+  const campos = ["Cuenta Origen", "N° de Referencia", "Titular Origen", "CUIT Origen", "Fecha", "Hora",
+    "Cuenta Destino / CBU", "Titular Destino", "CUIT Destino", "Importe", "Motivo", "Concepto"];
+  const c = Object.fromEntries(campos.map(k => [k, ""]));
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   const CUIT_RE = /(\d{2}-\d{7,8}-\d|\d{11})/;
   let m;
@@ -293,31 +500,97 @@ function parseBbvaTransferencias(text) {
   }
   if (p["CUIT"] && !c["CUIT Origen"]) c["CUIT Origen"] = p["CUIT"];
 
-  for (const k of KEYS) c[k] = (c[k] || "").trim();
+  for (const k of campos) c[k] = (c[k] || "").trim();
   c["Titular Origen"] = cleanTrailingFecha(c["Titular Origen"]);
-  return KEYS.map(k => ({ Campo: k, Valor: c[k] }));
+  return campos.map(k => ({ Campo: k, Valor: c[k] }));
 }
 
-function parseText(text, banco, operacion) {
-  if (banco === "BBVA" && operacion === "Transferencias") {
-    return { structured: true, parsed: parseBbvaTransferencias(text) };
-  }
-  // Todavía no hay extracción implementada para otras combinaciones de
-  // banco/operación: se devuelve el texto crudo línea por línea para que
-  // se pueda revisar, pero btnGuardar lo excluye del guardado (ver render()).
+// ---------------- Extracción: Cheques ----------------
+// TODO: todavía no hay un ejemplo real de cheque (emitido ni de terceros)
+// para armar el parser. Por ahora se devuelve el texto crudo sin
+// estructurar, igual que cualquier combinación sin soporte (ver
+// parseSinSoporte). Cuando haya un ejemplo, esta función debería devolver
+// { structured: true, parsed: [...] } con los campos de HEADERS_CHEQUES
+// (menos Archivo, Banco y Tipo, que ya los pone clasificarYParsear).
+function parseCheque(text, banco, tipoCheque) {
+  return parseSinSoporte(text);
+}
+
+function parseSinSoporte(text) {
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   return { structured: false, parsed: lines.map((l, i) => ({ Campo: `Línea ${i + 1}`, Valor: l })) };
 }
 
-// ---------------- Interfaz ----------------
+// Decide a qué hoja va cada comprobante (transferencias o cheques) y lo
+// parsea con la función correspondiente.
+function clasificarYParsear(text, banco, tipo) {
+  if (tipo === "Transferencia") {
+    const base = { destino: "transferencias", tipoCheque: null };
+    if (banco === "BBVA") {
+      return Object.assign(base, { structured: true, parsed: parseBbvaTransferencias(text) });
+    }
+    return Object.assign(base, parseSinSoporte(text), {
+      motivoSinSoporte: "La extracción automática para este banco todavía no está implementada."
+    });
+  }
+  if (tipo === "Cheque emitido" || tipo === "Cheque de terceros") {
+    const tipoCheque = tipo === "Cheque emitido" ? "Emitido" : "De terceros";
+    const resultado = parseCheque(text, banco, tipoCheque);
+    return Object.assign({ destino: "cheques", tipoCheque }, resultado, {
+      motivoSinSoporte: resultado.structured ? null :
+        "La extracción automática para cheques todavía no está implementada (falta un comprobante de ejemplo para armar el parser). Se puede revisar el texto leído, pero no se guarda hasta que esté lista."
+    });
+  }
+  return Object.assign({ destino: null, tipoCheque: null }, parseSinSoporte(text), {
+    motivoSinSoporte: "Esta combinación de banco/tipo todavía no tiene extracción automática."
+  });
+}
+
+// ---------------- Importes (formato argentino: punto de miles, coma decimal) ----------------
+function parseImporte(str) {
+  if (!str) return 0;
+  let s = String(str).trim().replace(/[^0-9.,-]/g, "");
+  const lastComma = s.lastIndexOf(",");
+  const lastDot = s.lastIndexOf(".");
+  if (lastComma > lastDot) {
+    s = s.replace(/\./g, "").replace(",", ".");
+  } else if (lastDot > lastComma) {
+    s = s.replace(/,/g, "");
+  }
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
+
+function formatImporte(n) {
+  return "$ " + new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+}
+
+// ---------------- Interfaz: navegación ----------------
 const $ = id => document.getElementById(id);
 let results = [];
+
+const vistas = ["cargar", "transferencias", "cheques"];
+document.querySelectorAll(".nav-item").forEach(btn => {
+  btn.addEventListener("click", () => mostrarVista(btn.dataset.vista));
+});
+
+function mostrarVista(nombre) {
+  vistas.forEach(v => {
+    $("vista-" + v).classList.toggle("active", v === nombre);
+  });
+  document.querySelectorAll(".nav-item").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.vista === nombre);
+  });
+  if (nombre === "transferencias" && !transferenciasCargadas) cargarTransferencias();
+  if (nombre === "cheques" && !chequesCargados) cargarCheques();
+}
 
 function setStatus(el, text, cls) {
   el.textContent = text;
   el.className = cls || "";
 }
 
+// ---------------- Interfaz: carga y procesamiento ----------------
 function render() {
   $("resultsSection").hidden = results.length === 0;
   const box = $("results");
@@ -331,14 +604,14 @@ function render() {
     const h3 = document.createElement("h3");
     h3.textContent = r.filename;
     const badge = document.createElement("span");
-    badge.className = "badge " + (r.error ? "msg-error" : r.sent ? "msg-ok" : "");
+    badge.className = "badge " + (r.error ? "badge-error" : r.sent ? "badge-guardado" : r.structured ? "badge-pendiente" : "badge-texto");
     badge.textContent = r.error ? "Error" : r.sent ? "Guardado" : r.structured ? "Pendiente" : "Solo texto";
     head.append(h3, badge);
     card.append(head);
 
     const meta = document.createElement("p");
     meta.className = "hint";
-    meta.textContent = `${r.banco} · ${r.operacion}`;
+    meta.textContent = `${r.banco} · ${r.tipo}`;
     card.append(meta);
 
     if (r.error) {
@@ -347,10 +620,10 @@ function render() {
       p.textContent = r.error;
       card.append(p);
     } else {
-      if (!r.structured) {
+      if (!r.structured && r.motivoSinSoporte) {
         const warn = document.createElement("p");
         warn.className = "warn";
-        warn.textContent = "Esta combinación de banco/operación todavía no tiene extracción automática: se puede revisar el texto leído, pero no se va a guardar en la hoja.";
+        warn.textContent = r.motivoSinSoporte;
         card.append(warn);
       }
 
@@ -369,7 +642,7 @@ function render() {
         tr.append(td1, td2);
         table.append(tr);
       }
-      card.append(table);
+      card.append(envolverTabla(table));
 
       const det = document.createElement("details");
       det.style.marginTop = "10px";
@@ -386,7 +659,7 @@ function render() {
 $("btnProcesar").addEventListener("click", async () => {
   const files = [...$("files").files];
   if (!files.length) { setStatus($("status"), "Elegí al menos un archivo.", "msg-error"); return; }
-  const banco = $("banco").value, operacion = $("operacion").value;
+  const banco = $("banco").value, tipo = $("tipo").value;
   $("btnProcesar").disabled = true;
 
   for (let i = 0; i < files.length; i++) {
@@ -395,10 +668,10 @@ $("btnProcesar").addEventListener("click", async () => {
     ocrProgress = (st, pr) => setStatus($("status"),
       `${prefix}: ${st === "recognizing text" ? "leyendo texto" : "preparando OCR"} ${Math.round(pr * 100)}%`);
     setStatus($("status"), `${prefix}: abriendo…`);
-    const r = { filename: f.name, banco, operacion, parsed: [], text: "", sent: false, structured: false, error: null };
+    const r = { filename: f.name, banco, tipo, parsed: [], text: "", sent: false, structured: false, error: null };
     try {
       r.text = await ocrFromFile(f);
-      Object.assign(r, parseText(r.text, banco, operacion));
+      Object.assign(r, clasificarYParsear(r.text, banco, tipo));
     } catch (e) {
       r.error = "No se pudo leer el archivo: " + (e && e.message ? e.message : e);
     }
@@ -410,37 +683,65 @@ $("btnProcesar").addEventListener("click", async () => {
   $("btnProcesar").disabled = false;
 });
 
-function rowFor(r) {
+// Arma la fila en el mismo orden que HEADERS_* del lado del servidor.
+function filaDesde(r, headers) {
   const lookup = Object.fromEntries(r.parsed.map(x => [x.Campo, x.Valor]));
-  return [r.filename, ...KEYS.map(k => lookup[k] || "")];
+  return headers.map(h => {
+    if (h === "Archivo") return r.filename;
+    if (h === "Banco") return r.banco;
+    if (h === "Tipo") return r.tipoCheque || "";
+    return lookup[h] || "";
+  });
 }
 
-$("btnGuardar").addEventListener("click", () => {
+function runAsync(fn, arg) {
+  return new Promise((resolve, reject) => {
+    google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[fn](arg);
+  });
+}
+
+$("btnGuardar").addEventListener("click", async () => {
   const st = $("saveStatus");
-  const pending = results.filter(r => !r.error && !r.sent && r.structured);
-  if (!pending.length) {
+  const pendientesTransferencias = results.filter(r => !r.error && !r.sent && r.structured && r.destino === "transferencias");
+  const pendientesCheques = results.filter(r => !r.error && !r.sent && r.structured && r.destino === "cheques");
+
+  if (!pendientesTransferencias.length && !pendientesCheques.length) {
     setStatus(st, "No hay comprobantes pendientes para guardar.", "msg-error");
     return;
   }
-  $("btnGuardar").disabled = true;
-  setStatus(st, `Guardando ${pending.length} comprobante(s)…`);
 
-  google.script.run
-    .withSuccessHandler(res => {
-      pending.forEach(r => { r.sent = true; });
-      render();
-      let msg = `Se guardaron ${res.agregadas} comprobante(s) en la hoja.`;
-      if (res.duplicadas && res.duplicadas.length) {
-        msg += ` No se cargaron ${res.duplicadas.length} porque ya estaban: ${res.duplicadas.join(", ")}.`;
-      }
-      setStatus(st, msg, "msg-ok");
-      $("btnGuardar").disabled = false;
-    })
-    .withFailureHandler(err => {
-      setStatus(st, "Error al guardar: " + (err && err.message ? err.message : err), "msg-error");
-      $("btnGuardar").disabled = false;
-    })
-    .guardarComprobantes(pending.map(rowFor));
+  $("btnGuardar").disabled = true;
+  setStatus(st, "Guardando…");
+  try {
+    let agregadas = 0;
+    let duplicadas = [];
+
+    if (pendientesTransferencias.length) {
+      const res = await runAsync("guardarComprobantes", pendientesTransferencias.map(r => filaDesde(r, HEADERS_TRANSFERENCIAS)));
+      pendientesTransferencias.forEach(r => { r.sent = true; });
+      agregadas += res.agregadas;
+      duplicadas = duplicadas.concat(res.duplicadas);
+    }
+    if (pendientesCheques.length) {
+      const res = await runAsync("guardarCheques", pendientesCheques.map(r => filaDesde(r, HEADERS_CHEQUES)));
+      pendientesCheques.forEach(r => { r.sent = true; });
+      agregadas += res.agregadas;
+      duplicadas = duplicadas.concat(res.duplicadas);
+    }
+
+    render();
+    let msg = `Se guardaron ${agregadas} comprobante(s).`;
+    if (duplicadas.length) {
+      msg += ` No se cargaron ${duplicadas.length} porque ya estaban: ${duplicadas.join(", ")}.`;
+    }
+    setStatus(st, msg, "msg-ok");
+    transferenciasCargadas = false;  // para que la próxima vez que se abra esa vista, se refresque
+    chequesCargados = false;
+  } catch (err) {
+    setStatus(st, "Error al guardar: " + (err && err.message ? err.message : err), "msg-error");
+  } finally {
+    $("btnGuardar").disabled = false;
+  }
 });
 
 $("btnLimpiar").addEventListener("click", () => {
@@ -448,6 +749,199 @@ $("btnLimpiar").addEventListener("click", () => {
   setStatus($("saveStatus"), "");
   render();
 });
+
+// ---------------- Vista: Transferencias (agrupadas por banco y destinatario) ----------------
+let transferenciasCargadas = false;
+
+$("btnRefrescarTransferencias").addEventListener("click", () => cargarTransferencias(true));
+
+function cargarTransferencias(forzar) {
+  if (transferenciasCargadas && !forzar) return;
+  const box = $("transferenciasBox");
+  box.replaceChildren(nodoCargando());
+  google.script.run
+    .withSuccessHandler(filas => {
+      transferenciasCargadas = true;
+      renderTransferencias(filas);
+    })
+    .withFailureHandler(err => {
+      box.replaceChildren(nodoError("No se pudieron traer las transferencias: " + (err && err.message ? err.message : err)));
+    })
+    .obtenerTransferencias();
+}
+
+function renderTransferencias(filas) {
+  const box = $("transferenciasBox");
+  box.replaceChildren();
+  if (!filas.length) {
+    box.append(nodoVacio("Todavía no hay transferencias guardadas."));
+    return;
+  }
+
+  const porBanco = agruparPor(filas, "Banco");
+  Object.keys(porBanco).sort().forEach(banco => {
+    const filasBanco = porBanco[banco];
+    const totalBanco = filasBanco.reduce((acc, f) => acc + parseImporte(f["Importe"]), 0);
+
+    const grupo = document.createElement("div");
+    grupo.className = "banco-group";
+
+    const head = document.createElement("div");
+    head.className = "banco-head";
+    head.innerHTML = `<h2>${escapeHtml(banco)}</h2><span class="total">${filasBanco.length} transferencia(s) · ${formatImporte(totalBanco)}</span>`;
+    grupo.append(head);
+
+    const porDestinatario = agruparPor(filasBanco, "Titular Destino");
+    Object.keys(porDestinatario).sort().forEach(destinatario => {
+      const filasDest = porDestinatario[destinatario].slice().sort((a, b) => (a["Fecha"] || "").localeCompare(b["Fecha"] || ""));
+      const totalDest = filasDest.reduce((acc, f) => acc + parseImporte(f["Importe"]), 0);
+
+      const sub = document.createElement("div");
+      sub.className = "sub-group";
+      const subHead = document.createElement("div");
+      subHead.className = "sub-head";
+      subHead.innerHTML = `<span>${escapeHtml(destinatario)}</span><span class="count">${filasDest.length} · ${formatImporte(totalDest)}</span>`;
+      sub.append(subHead);
+
+      const table = document.createElement("table");
+      table.innerHTML = "<tr><th>Fecha</th><th>Importe</th><th>Motivo / Concepto</th><th>Referencia</th></tr>";
+      filasDest.forEach(f => {
+        const tr = document.createElement("tr");
+        tr.append(
+          celda(f["Fecha"]), celda(formatImporte(parseImporte(f["Importe"]))),
+          celda([f["Motivo"], f["Concepto"]].filter(Boolean).join(" · ")),
+          celda(f["N° de Referencia"])
+        );
+        table.append(tr);
+      });
+      sub.append(envolverTabla(table));
+      grupo.append(sub);
+    });
+
+    box.append(grupo);
+  });
+}
+
+// ---------------- Vista: Cheques (agrupados por banco y tipo) ----------------
+let chequesCargados = false;
+
+$("btnRefrescarCheques").addEventListener("click", () => cargarCheques(true));
+
+function cargarCheques(forzar) {
+  if (chequesCargados && !forzar) return;
+  const box = $("chequesBox");
+  box.replaceChildren(nodoCargando());
+  google.script.run
+    .withSuccessHandler(filas => {
+      chequesCargados = true;
+      renderCheques(filas);
+    })
+    .withFailureHandler(err => {
+      box.replaceChildren(nodoError("No se pudieron traer los cheques: " + (err && err.message ? err.message : err)));
+    })
+    .obtenerCheques();
+}
+
+function renderCheques(filas) {
+  const box = $("chequesBox");
+  box.replaceChildren();
+  if (!filas.length) {
+    box.append(nodoVacio("Todavía no hay cheques guardados."));
+    return;
+  }
+
+  const porBanco = agruparPor(filas, "Banco");
+  Object.keys(porBanco).sort().forEach(banco => {
+    const filasBanco = porBanco[banco];
+    const totalBanco = filasBanco.reduce((acc, f) => acc + parseImporte(f["Importe"]), 0);
+
+    const grupo = document.createElement("div");
+    grupo.className = "banco-group";
+    const head = document.createElement("div");
+    head.className = "banco-head";
+    head.innerHTML = `<h2>${escapeHtml(banco)}</h2><span class="total">${filasBanco.length} cheque(s) · ${formatImporte(totalBanco)}</span>`;
+    grupo.append(head);
+
+    const porTipo = agruparPor(filasBanco, "Tipo");
+    Object.keys(porTipo).sort().forEach(tipo => {
+      const filasTipo = porTipo[tipo].slice().sort((a, b) => (a["Fecha de Pago"] || "").localeCompare(b["Fecha de Pago"] || ""));
+      const totalTipo = filasTipo.reduce((acc, f) => acc + parseImporte(f["Importe"]), 0);
+
+      const sub = document.createElement("div");
+      sub.className = "sub-group";
+      const subHead = document.createElement("div");
+      subHead.className = "sub-head";
+      subHead.innerHTML = `<span>${escapeHtml(tipo || "Sin tipo")}</span><span class="count">${filasTipo.length} · ${formatImporte(totalTipo)}</span>`;
+      sub.append(subHead);
+
+      const table = document.createElement("table");
+      table.innerHTML = "<tr><th>N° de Cheque</th><th>Titular</th><th>Fecha de Pago</th><th>Importe</th><th>Concepto</th></tr>";
+      filasTipo.forEach(f => {
+        const tr = document.createElement("tr");
+        tr.append(
+          celda(f["N° de Cheque"]), celda(f["Titular"]), celda(f["Fecha de Pago"]),
+          celda(formatImporte(parseImporte(f["Importe"]))), celda(f["Concepto"])
+        );
+        table.append(tr);
+      });
+      sub.append(envolverTabla(table));
+      grupo.append(sub);
+    });
+
+    box.append(grupo);
+  });
+}
+
+// ---------------- Utilidades de render ----------------
+function agruparPor(filas, campo) {
+  const grupos = {};
+  filas.forEach(f => {
+    const clave = f[campo] || "Sin dato";
+    if (!grupos[clave]) grupos[clave] = [];
+    grupos[clave].push(f);
+  });
+  return grupos;
+}
+
+function celda(texto) {
+  const td = document.createElement("td");
+  td.textContent = texto || "";
+  return td;
+}
+
+function envolverTabla(table) {
+  const wrap = document.createElement("div");
+  wrap.className = "table-wrap";
+  wrap.append(table);
+  return wrap;
+}
+
+function nodoCargando() {
+  const p = document.createElement("p");
+  p.className = "hint";
+  p.textContent = "Cargando…";
+  return p;
+}
+
+function nodoError(texto) {
+  const p = document.createElement("p");
+  p.className = "msg-error";
+  p.textContent = texto;
+  return p;
+}
+
+function nodoVacio(texto) {
+  const div = document.createElement("div");
+  div.className = "empty-state card";
+  div.textContent = texto;
+  return div;
+}
+
+function escapeHtml(s) {
+  const div = document.createElement("div");
+  div.textContent = s == null ? "" : s;
+  return div.innerHTML;
+}
 </script>
 </body>
 </html>
