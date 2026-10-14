@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<base target="_top">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lector de comprobantes</title>
+<!-- OCR (lectura de texto) y lectura de PDF, en el navegador -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --text: #1d2330; --muted: #646d7e;
+    --border: #d9dde4; --accent: #1a5fd0; --accent-text: #ffffff;
+    --ok: #1f7a3d; --error: #b00020; --th: #eef1f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14171c; --card: #1d2128; --text: #e6e9ee; --muted: #9aa3b2;
+      --border: #343a45; --accent: #5b93f0; --accent-text: #0e1116;
+      --ok: #5cc581; --error: #ff6b81; --th: #262b34;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif; }
+  main { max-width: 900px; margin: 0 auto; padding: 20px 16px 60px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+          padding: 16px; margin-bottom: 16px; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; }
+  .row > label { flex: 1 1 200px; }
+  label { display: block; font-weight: 600; font-size: .9rem; }
+  select, input[type=file] {
+    display: block; width: 100%; margin-top: 4px; padding: 8px; font: inherit;
+    background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; }
+  .drop { margin-top: 12px; }
+  button { font: inherit; padding: 9px 16px; border-radius: 6px; border: 1px solid var(--accent);
+           background: var(--accent); color: var(--accent-text); cursor: pointer; font-weight: 600; }
+  button.secondary { background: transparent; color: var(--accent); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .hint { color: var(--muted); font-size: .85rem; margin: 6px 0 0; }
+  #status { margin: 10px 0 0; color: var(--muted); min-height: 1.2em; }
+  .msg-ok { color: var(--ok); } .msg-error { color: var(--error); }
+  .file-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .file-head h3 { margin: 0; font-size: 1.05rem; word-break: break-all; }
+  .badge { font-size: .8rem; padding: 2px 8px; border-radius: 99px; border: 1px solid currentColor; }
+  table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+  th, td { border: 1px solid var(--border); padding: 6px 8px; text-align: left; vertical-align: middle; }
+  th { background: var(--th); }
+  td:first-child { width: 38%; }
+  td input { width: 100%; border: none; background: transparent; color: var(--text); font: inherit; padding: 2px; }
+  td input:focus { outline: 2px solid var(--accent); border-radius: 3px; }
+  details summary { cursor: pointer; font-weight: 600; }
+  pre { white-space: pre-wrap; font-size: .8rem; background: var(--bg); padding: 8px; border-radius: 6px; }
+  .warn { color: var(--error); font-size: .85rem; margin: 6px 0 10px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Lector de comprobantes</h1>
+  <p class="sub">Subí comprobantes (foto o PDF), revisá los datos y guardalos en la hoja.</p>
+
+  <section class="card">
+    <div class="row">
+      <label>Banco
+        <select id="banco">
+          <option>BBVA</option>
+          <option>Bancor</option>
+        </select>
+      </label>
+      <label>Operación
+        <select id="operacion">
+          <option>Efectivo</option>
+          <option selected>Transferencias</option>
+          <option>Cheques emitidos</option>
+          <option>Cheques de terceros</option>
+          <option>FCI</option>
+        </select>
+      </label>
+    </div>
+    <p class="hint">Por ahora la extracción automática de datos solo está implementada para
+      <strong>BBVA + Transferencias</strong>. Con otras combinaciones el comprobante se puede
+      revisar (se muestra el texto leído), pero no se guarda en la hoja.</p>
+    <label class="drop">Archivos (imagen o PDF) — podés elegir varios
+      <input type="file" id="files" accept=".jpg,.jpeg,.png,.pdf" multiple>
+    </label>
+    <div class="actions">
+      <button id="btnProcesar">Procesar</button>
+    </div>
+    <p id="status"></p>
+  </section>
+
+  <section id="resultsSection" hidden>
+    <div class="card">
+      <strong>Resultados</strong>
+      <p class="hint">Podés corregir cualquier valor antes de guardarlo.</p>
+      <div class="actions">
+        <button id="btnGuardar">Guardar en la hoja</button>
+        <button id="btnLimpiar" class="secondary">Limpiar</button>
+      </div>
+      <p id="saveStatus"></p>
+    </div>
+    <div id="results"></div>
+  </section>
+</main>
+
+<script>
+// ---------------- Configuración ----------------
+const KEYS = [
+  "Cuenta Origen", "N° de Referencia", "Titular Origen", "CUIT Origen", "Fecha", "Hora",
+  "Cuenta Destino / CBU", "Titular Destino", "CUIT Destino", "Importe", "Motivo", "Concepto"
+];
+
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+// ---------------- OCR ----------------
+let ocrWorker = null;
+let ocrProgress = () => {};
+
+async function getWorker() {
+  if (!ocrWorker) {
+    ocrWorker = await Tesseract.createWorker("spa", 1, {
+      logger: m => { if (typeof m.progress === "number") ocrProgress(m.status, m.progress); }
+    });
+    await ocrWorker.setParameters({ tessedit_pageseg_mode: "6" });
+  }
+  return ocrWorker;
+}
+
+// Escala de grises + contraste x2 para leer mejor
+function preprocess(canvas) {
+  const ctx = canvas.getContext("2d");
+  const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const d = img.data;
+  let sum = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    const g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    d[i] = g; sum += g;
+  }
+  const mean = Math.round(sum / (d.length / 4));
+  for (let i = 0; i < d.length; i += 4) {
+    const v = Math.max(0, Math.min(255, mean + (d[i] - mean) * 2));
+    d[i] = d[i + 1] = d[i + 2] = v;
+  }
+  ctx.putImageData(img, 0, 0);
+  return canvas;
+}
+
+async function imageFileToCanvas(file) {
+  const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+  const canvas = document.createElement("canvas");
+  canvas.width = bmp.width; canvas.height = bmp.height;
+  canvas.getContext("2d").drawImage(bmp, 0, 0);
+  bmp.close();
+  return canvas;
+}
+
+async function pdfFileToCanvases(file, zoom = 3) {
+  const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+  const canvases = [];
+  for (let n = 1; n <= pdf.numPages; n++) {
+    const page = await pdf.getPage(n);
+    const viewport = page.getViewport({ scale: zoom });
+    const canvas = document.createElement("canvas");
+    canvas.width = viewport.width; canvas.height = viewport.height;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    canvases.push(canvas);
+  }
+  await pdf.destroy();
+  return canvases;
+}
+
+async function ocrFromFile(file) {
+  const worker = await getWorker();
+  const canvases = file.name.toLowerCase().endsWith(".pdf")
+    ? await pdfFileToCanvases(file)
+    : [await imageFileToCanvas(file)];
+  let text = "";
+  for (const c of canvases) {
+    const { data } = await worker.recognize(preprocess(c));
+    text += data.text + "\n";
+  }
+  return text;
+}
+
+// ---------------- Extracción de campos ----------------
+// Búsqueda de respaldo: se usa solo para completar campos que las pasadas
+// con etiqueta (parseBbvaTransferencias) no encontraron. Busca el PRIMER
+// patrón que matchea en todo el texto, así que si el comprobante tiene más
+// de un número con la misma forma (dos CBU de 22 dígitos, por ejemplo),
+// puede asignar el que no corresponde. Es un último recurso, no la fuente
+// principal de los datos.
+function findPatterns(text) {
+  const p = {}; let m;
+  if ((m = text.match(/\b(\d{22})\b/))) p["Cuenta Destino / CBU"] = m[1];
+  if ((m = text.match(/\b(\d{2}-\d{7,8}-\d|\d{11})\b/))) p["CUIT"] = m[1];
+  if ((m = text.match(/\b(\d{17})\b/))) p["N° de Referencia"] = m[1];
+  if ((m = text.match(/\b(\d{2}\/\d{2}\/\d{4})\b/))) p["Fecha"] = m[1];
+  if ((m = text.match(/\b(\d{2}:\d{2}:\d{2})\b/))) p["Hora"] = m[1];
+  if ((m = text.match(/(\d{1,3}(?:\.\d{3})*,\d{2}|\d{1,3}(?:,\d{3})*\.\d{2})/))) p["Importe"] = m[1];
+  return p;
+}
+
+function cleanTrailingFecha(v) {
+  return v ? v.replace(/\bFecha\b\.?\s*$/i, "").trim() : v;
+}
+
+function parseBbvaTransferencias(text) {
+  const c = Object.fromEntries(KEYS.map(k => [k, ""]));
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const CUIT_RE = /(\d{2}-\d{7,8}-\d|\d{11})/;
+  let m;
+
+  // Pase 1: "Campo: valor" en la misma línea
+  for (const line of lines) {
+    if (!line.includes(":") || line.endsWith(":")) continue;
+    const idx = line.indexOf(":");
+    const left = line.slice(0, idx).trim();
+    const right = line.slice(idx + 1).trim();
+
+    if (/Cuenta Origen/i.test(left)) {
+      m = right.match(/([A-Z]{0,3}\s*\$?\s*\d{3,}-\d{6,}\/\d?)|(\d{18})/);
+      c["Cuenta Origen"] = m ? m[0].trim() : right;
+      if ((m = line.match(/(\d{17})/))) c["N° de Referencia"] = m[1];
+    } else if (/Cuenta Destino|CBU\/CVU Destino|CBU/i.test(left)) {
+      m = right.match(/(\d{22})/);
+      c["Cuenta Destino / CBU"] = m ? m[1] : right;
+      if ((m = right.match(/(\d{2}:\d{2}:\d{2})/))) c["Hora"] = m[1];
+    } else if (/Titularidad/i.test(left)) {
+      // Heurística: se asume que la primera "Titularidad" leída corresponde
+      // al origen y la segunda al destino, siguiendo el orden habitual del
+      // comprobante de BBVA. Si algún layout viniera invertido, se asignaría mal.
+      if (!c["Titular Origen"]) c["Titular Origen"] = cleanTrailingFecha(right);
+      else c["Titular Destino"] = right;
+    } else if (/CUIT|CUIL|CDI/i.test(left)) {
+      if ((m = right.match(CUIT_RE))) {
+        if (!c["CUIT Origen"]) c["CUIT Origen"] = m[1]; else c["CUIT Destino"] = m[1];
+      }
+      if ((m = right.match(/(\d{2}\/\d{2}\/\d{4})/))) c["Fecha"] = m[1];
+    } else if (/Importe/i.test(left)) {
+      c["Importe"] = right;
+    } else if (/Motivo/i.test(left)) {
+      c["Motivo"] = right;
+    } else if (/Concepto/i.test(left)) {
+      c["Concepto"] = right;
+    } else if (/Referencia/i.test(left)) {
+      m = right.match(/(\d{17})/);
+      c["N° de Referencia"] = m ? m[1] : right;
+    } else if (/^Fecha$/i.test(left)) {
+      if ((m = right.match(/(\d{2}\/\d{2}\/\d{4})/))) c["Fecha"] = m[1];
+    } else if (/^Hora$/i.test(left)) {
+      if ((m = right.match(/(\d{2}:\d{2}(?::\d{2})?)/))) c["Hora"] = m[1];
+    }
+  }
+
+  // Pase 2: título en una línea y valor en la siguiente
+  const TITLE_RE = /^(Fecha|Hora|Importe|Motivo|Concepto|Nº de Referencia|N° de Referencia|Cuenta Origen|Cuenta Destino|CBU\/CVU Destino|Titularidad|CUIT \/ CUIL \/ CDI|CUIT)$/i;
+  for (let i = 0; i < lines.length; i++) {
+    const title = lines[i].replace(/:/g, "").trim();
+    if (!TITLE_RE.test(title)) continue;
+    const next = lines[i + 1] || "";
+    if (/Cuenta Origen/i.test(title)) {
+      c["Cuenta Origen"] = next;
+    } else if (/Cuenta Destino|CBU/i.test(title)) {
+      m = next.match(/(\d{22})/);
+      c["Cuenta Destino / CBU"] = m ? m[1] : next;
+    } else if (/Titularidad/i.test(title)) {
+      if (!c["Titular Origen"]) c["Titular Origen"] = cleanTrailingFecha(next);
+      else c["Titular Destino"] = next;
+    } else if (/CUIT/i.test(title)) {
+      m = next.match(CUIT_RE);
+      const v = m ? m[1] : next;
+      if (!c["CUIT Origen"]) c["CUIT Origen"] = v; else c["CUIT Destino"] = v;
+    } else if (/Fecha/i.test(title)) c["Fecha"] = next;
+    else if (/Hora/i.test(title)) c["Hora"] = next;
+    else if (/Referencia/i.test(title)) c["N° de Referencia"] = next;
+    else if (/Importe/i.test(title)) c["Importe"] = next;
+    else if (/Motivo/i.test(title)) c["Motivo"] = next;
+    else if (/Concepto/i.test(title)) c["Concepto"] = next;
+    i++;  // saltar la línea del valor
+  }
+
+  // Pase 3: completar lo que falte buscando patrones en todo el texto
+  const p = findPatterns(text);
+  for (const k of ["Cuenta Destino / CBU", "N° de Referencia", "Fecha", "Hora", "Importe"]) {
+    if (p[k] && !c[k]) c[k] = p[k];
+  }
+  if (p["CUIT"] && !c["CUIT Origen"]) c["CUIT Origen"] = p["CUIT"];
+
+  for (const k of KEYS) c[k] = (c[k] || "").trim();
+  c["Titular Origen"] = cleanTrailingFecha(c["Titular Origen"]);
+  return KEYS.map(k => ({ Campo: k, Valor: c[k] }));
+}
+
+function parseText(text, banco, operacion) {
+  if (banco === "BBVA" && operacion === "Transferencias") {
+    return { structured: true, parsed: parseBbvaTransferencias(text) };
+  }
+  // Todavía no hay extracción implementada para otras combinaciones de
+  // banco/operación: se devuelve el texto crudo línea por línea para que
+  // se pueda revisar, pero btnGuardar lo excluye del guardado (ver render()).
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  return { structured: false, parsed: lines.map((l, i) => ({ Campo: `Línea ${i + 1}`, Valor: l })) };
+}
+
+// ---------------- Interfaz ----------------
+const $ = id => document.getElementById(id);
+let results = [];
+
+function setStatus(el, text, cls) {
+  el.textContent = text;
+  el.className = cls || "";
+}
+
+function render() {
+  $("resultsSection").hidden = results.length === 0;
+  const box = $("results");
+  box.replaceChildren();
+  for (const r of results) {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const head = document.createElement("div");
+    head.className = "file-head";
+    const h3 = document.createElement("h3");
+    h3.textContent = r.filename;
+    const badge = document.createElement("span");
+    badge.className = "badge " + (r.error ? "msg-error" : r.sent ? "msg-ok" : "");
+    badge.textContent = r.error ? "Error" : r.sent ? "Guardado" : r.structured ? "Pendiente" : "Solo texto";
+    head.append(h3, badge);
+    card.append(head);
+
+    const meta = document.createElement("p");
+    meta.className = "hint";
+    meta.textContent = `${r.banco} · ${r.operacion}`;
+    card.append(meta);
+
+    if (r.error) {
+      const p = document.createElement("p");
+      p.className = "msg-error";
+      p.textContent = r.error;
+      card.append(p);
+    } else {
+      if (!r.structured) {
+        const warn = document.createElement("p");
+        warn.className = "warn";
+        warn.textContent = "Esta combinación de banco/operación todavía no tiene extracción automática: se puede revisar el texto leído, pero no se va a guardar en la hoja.";
+        card.append(warn);
+      }
+
+      const table = document.createElement("table");
+      table.innerHTML = "<tr><th>Campo</th><th>Valor</th></tr>";
+      for (const row of r.parsed) {
+        const tr = document.createElement("tr");
+        const td1 = document.createElement("td");
+        td1.textContent = row.Campo;
+        const td2 = document.createElement("td");
+        const input = document.createElement("input");
+        input.value = row.Valor;
+        input.disabled = !r.structured;
+        input.addEventListener("input", () => { row.Valor = input.value; });
+        td2.append(input);
+        tr.append(td1, td2);
+        table.append(tr);
+      }
+      card.append(table);
+
+      const det = document.createElement("details");
+      det.style.marginTop = "10px";
+      det.innerHTML = "<summary>Ver texto leído (OCR)</summary>";
+      const pre = document.createElement("pre");
+      pre.textContent = r.text;
+      det.append(pre);
+      card.append(det);
+    }
+    box.append(card);
+  }
+}
+
+$("btnProcesar").addEventListener("click", async () => {
+  const files = [...$("files").files];
+  if (!files.length) { setStatus($("status"), "Elegí al menos un archivo.", "msg-error"); return; }
+  const banco = $("banco").value, operacion = $("operacion").value;
+  $("btnProcesar").disabled = true;
+
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    const prefix = `Archivo ${i + 1} de ${files.length} (${f.name})`;
+    ocrProgress = (st, pr) => setStatus($("status"),
+      `${prefix}: ${st === "recognizing text" ? "leyendo texto" : "preparando OCR"} ${Math.round(pr * 100)}%`);
+    setStatus($("status"), `${prefix}: abriendo…`);
+    const r = { filename: f.name, banco, operacion, parsed: [], text: "", sent: false, structured: false, error: null };
+    try {
+      r.text = await ocrFromFile(f);
+      Object.assign(r, parseText(r.text, banco, operacion));
+    } catch (e) {
+      r.error = "No se pudo leer el archivo: " + (e && e.message ? e.message : e);
+    }
+    results.push(r);
+    render();
+  }
+  setStatus($("status"), `Listo: ${files.length} archivo(s) procesado(s).`, "msg-ok");
+  $("files").value = "";
+  $("btnProcesar").disabled = false;
+});
+
+function rowFor(r) {
+  const lookup = Object.fromEntries(r.parsed.map(x => [x.Campo, x.Valor]));
+  return [r.filename, ...KEYS.map(k => lookup[k] || "")];
+}
+
+$("btnGuardar").addEventListener("click", () => {
+  const st = $("saveStatus");
+  const pending = results.filter(r => !r.error && !r.sent && r.structured);
+  if (!pending.length) {
+    setStatus(st, "No hay comprobantes pendientes para guardar.", "msg-error");
+    return;
+  }
+  $("btnGuardar").disabled = true;
+  setStatus(st, `Guardando ${pending.length} comprobante(s)…`);
+
+  google.script.run
+    .withSuccessHandler(res => {
+      pending.forEach(r => { r.sent = true; });
+      render();
+      let msg = `Se guardaron ${res.agregadas} comprobante(s) en la hoja.`;
+      if (res.duplicadas && res.duplicadas.length) {
+        msg += ` No se cargaron ${res.duplicadas.length} porque ya estaban: ${res.duplicadas.join(", ")}.`;
+      }
+      setStatus(st, msg, "msg-ok");
+      $("btnGuardar").disabled = false;
+    })
+    .withFailureHandler(err => {
+      setStatus(st, "Error al guardar: " + (err && err.message ? err.message : err), "msg-error");
+      $("btnGuardar").disabled = false;
+    })
+    .guardarComprobantes(pending.map(rowFor));
+});
+
+$("btnLimpiar").addEventListener("click", () => {
+  results = [];
+  setStatus($("saveStatus"), "");
+  render();
+});
+</script>
+</body>
+</html>
