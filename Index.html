@@ -120,11 +120,12 @@
   .row { display: flex; flex-wrap: wrap; gap: 14px; }
   .row > label { flex: 1 1 180px; }
   label { display: block; font-weight: 600; font-size: .85rem; color: var(--muted); }
-  select, input[type=file] {
+  select, input[type=file], input[type=text] {
     display: block; width: 100%; margin-top: 6px; padding: 9px 10px; font: inherit;
     background: var(--surface-soft); color: var(--text); border: 1px solid var(--border);
     border-radius: 9px;
   }
+  input[type=text]:focus, select:focus { outline: 2px solid var(--primary); outline-offset: 1px; }
   .drop { margin-top: 14px; }
   button {
     font: inherit; padding: 10px 18px; border-radius: 9px; border: 1px solid var(--primary);
@@ -189,6 +190,34 @@
   .empty-state { text-align: center; color: var(--muted); padding: 40px 10px; }
   .empty-state svg { opacity: .5; margin-bottom: 10px; }
 
+  /* ---------- Modal (entrada manual) ---------- */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(15, 20, 32, 0.55);
+    display: none; align-items: center; justify-content: center;
+    padding: 20px; z-index: 50;
+  }
+  .modal-overlay.is-open { display: flex; }
+  .modal {
+    background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow);
+    max-width: 640px; width: 100%; max-height: 88vh; display: flex; flex-direction: column;
+  }
+  .modal__head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+  }
+  .modal__head h3 { margin: 0; font-size: 1.05rem; }
+  .modal__close {
+    background: none; border: none; font-size: 1.3rem; line-height: 1; cursor: pointer;
+    color: var(--muted);
+  }
+  .modal__body { padding: 18px 20px; overflow-y: auto; }
+  .modal__body .row { margin-bottom: 12px; }
+  .manual-campos[hidden] { display: none; }
+  .modal__foot {
+    padding: 14px 20px; border-top: 1px solid var(--border);
+    display: flex; justify-content: flex-end; gap: 8px;
+  }
+
   html, body { overflow-x: hidden; }
 
   @media (max-width: 760px) {
@@ -227,8 +256,13 @@
   <main>
     <!-- ===================== VISTA: CARGAR ===================== -->
     <section id="vista-cargar" class="view active">
-      <h1>Cargar comprobantes</h1>
-      <p class="sub">Subí comprobantes (foto o PDF), revisá los datos y guardalos.</p>
+      <div class="group-toolbar">
+        <div>
+          <h1>Cargar comprobantes</h1>
+          <p class="sub" style="margin-bottom:0">Subí comprobantes (foto o PDF), revisá los datos y guardalos.</p>
+        </div>
+        <button class="secondary btn-entrada-manual" data-tipo-default="Transferencia" type="button">Entrada manual</button>
+      </div>
 
       <div class="card">
         <div class="row">
@@ -249,7 +283,8 @@
           </label>
         </div>
         <p class="hint">Extracción automática implementada hoy: <strong>BBVA + Transferencia</strong>.
-          El resto se puede revisar (se muestra el texto leído) pero todavía no se guarda solo.</p>
+          El resto se puede revisar (se muestra el texto leído) pero todavía no se guarda solo.
+          Si no tenés el comprobante a mano, usá "Entrada manual" arriba.</p>
         <label class="drop">Archivos (imagen o PDF) — podés elegir varios
           <input type="file" id="files" accept=".jpg,.jpeg,.png,.pdf" multiple>
         </label>
@@ -280,7 +315,10 @@
           <h1>Transferencias</h1>
           <p class="sub" style="margin-bottom:0">Agrupadas por banco y, dentro de cada banco, por destinatario.</p>
         </div>
-        <button id="btnRefrescarTransferencias" class="secondary" type="button">Actualizar</button>
+        <div class="actions" style="margin-top:0">
+          <button class="secondary btn-entrada-manual" data-tipo-default="Transferencia" type="button">Entrada manual</button>
+          <button id="btnRefrescarTransferencias" class="secondary" type="button">Actualizar</button>
+        </div>
       </div>
       <div id="transferenciasBox"></div>
     </section>
@@ -292,11 +330,92 @@
           <h1>Cheques</h1>
           <p class="sub" style="margin-bottom:0">Agrupados por banco y por tipo (emitido / de terceros).</p>
         </div>
-        <button id="btnRefrescarCheques" class="secondary" type="button">Actualizar</button>
+        <div class="actions" style="margin-top:0">
+          <button class="secondary btn-entrada-manual" data-tipo-default="Cheque emitido" type="button">Entrada manual</button>
+          <button id="btnRefrescarCheques" class="secondary" type="button">Actualizar</button>
+        </div>
       </div>
       <div id="chequesBox"></div>
     </section>
   </main>
+</div>
+
+<!-- ===================== MODAL: ENTRADA MANUAL ===================== -->
+<div class="modal-overlay" id="modalManual">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalManualTitulo">
+    <div class="modal__head">
+      <h3 id="modalManualTitulo">Entrada manual</h3>
+      <button class="modal__close" id="modalManualCerrar" type="button" aria-label="Cerrar">&times;</button>
+    </div>
+    <div class="modal__body">
+      <div class="row">
+        <label>Tipo de comprobante
+          <select id="manualTipo">
+            <option>Transferencia</option>
+            <option>Cheque emitido</option>
+            <option>Cheque de terceros</option>
+          </select>
+        </label>
+        <label>Banco
+          <select id="manualBanco">
+            <option>BBVA</option>
+            <option>Bancor</option>
+          </select>
+        </label>
+      </div>
+
+      <div id="manualCamposTransferencia" class="manual-campos">
+        <div class="row">
+          <label>Cuenta Origen<input data-campo="Cuenta Origen" type="text"></label>
+          <label>N° de Referencia<input data-campo="N° de Referencia" type="text"></label>
+        </div>
+        <div class="row">
+          <label>Titular Origen<input data-campo="Titular Origen" type="text"></label>
+          <label>CUIT Origen<input data-campo="CUIT Origen" type="text"></label>
+        </div>
+        <div class="row">
+          <label>Fecha<input data-campo="Fecha" type="text" placeholder="dd/mm/aaaa"></label>
+          <label>Hora<input data-campo="Hora" type="text" placeholder="hh:mm:ss"></label>
+        </div>
+        <div class="row">
+          <label>Cuenta Destino / CBU<input data-campo="Cuenta Destino / CBU" type="text"></label>
+          <label>Titular Destino<input data-campo="Titular Destino" type="text"></label>
+        </div>
+        <div class="row">
+          <label>CUIT Destino<input data-campo="CUIT Destino" type="text"></label>
+          <label>Importe<input data-campo="Importe" type="text" placeholder="0,00"></label>
+        </div>
+        <div class="row">
+          <label>Motivo<input data-campo="Motivo" type="text"></label>
+          <label>Concepto<input data-campo="Concepto" type="text"></label>
+        </div>
+      </div>
+
+      <div id="manualCamposCheque" class="manual-campos" hidden>
+        <div class="row">
+          <label>N° de Cheque<input data-campo="N° de Cheque" type="text"></label>
+          <label>Titular<input data-campo="Titular" type="text"></label>
+        </div>
+        <div class="row">
+          <label>CUIT<input data-campo="CUIT" type="text"></label>
+          <label>Importe<input data-campo="Importe" type="text" placeholder="0,00"></label>
+        </div>
+        <div class="row">
+          <label>Fecha de Emisión<input data-campo="Fecha de Emisión" type="text" placeholder="dd/mm/aaaa"></label>
+          <label>Fecha de Pago<input data-campo="Fecha de Pago" type="text" placeholder="dd/mm/aaaa"></label>
+        </div>
+        <div class="row">
+          <label>Concepto<input data-campo="Concepto" type="text"></label>
+        </div>
+      </div>
+
+      <p id="manualStatus" class="hint"></p>
+    </div>
+    <div class="modal__foot">
+      <button class="secondary" id="modalManualCancelar" type="button">Cancelar</button>
+      <button id="modalManualGuardar" type="button">Guardar</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -748,6 +867,95 @@ $("btnLimpiar").addEventListener("click", () => {
   results = [];
   setStatus($("saveStatus"), "");
   render();
+});
+
+// ---------------- Modal: Entrada manual ----------------
+function actualizarCamposManual() {
+  const esTransferencia = $("manualTipo").value === "Transferencia";
+  $("manualCamposTransferencia").hidden = !esTransferencia;
+  $("manualCamposCheque").hidden = esTransferencia;
+}
+
+function limpiarCamposManual() {
+  document.querySelectorAll("#modalManual [data-campo]").forEach(input => { input.value = ""; });
+}
+
+function abrirModalManual(tipoDefault) {
+  $("manualTipo").value = tipoDefault || "Transferencia";
+  actualizarCamposManual();
+  limpiarCamposManual();
+  setStatus($("manualStatus"), "");
+  $("modalManual").classList.add("is-open");
+}
+
+function cerrarModalManual() {
+  $("modalManual").classList.remove("is-open");
+}
+
+document.querySelectorAll(".btn-entrada-manual").forEach(btn => {
+  btn.addEventListener("click", () => abrirModalManual(btn.dataset.tipoDefault));
+});
+
+$("manualTipo").addEventListener("change", actualizarCamposManual);
+$("modalManualCerrar").addEventListener("click", cerrarModalManual);
+$("modalManualCancelar").addEventListener("click", cerrarModalManual);
+$("modalManual").addEventListener("click", e => { if (e.target.id === "modalManual") cerrarModalManual(); });
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && $("modalManual").classList.contains("is-open")) cerrarModalManual();
+});
+
+$("modalManualGuardar").addEventListener("click", async () => {
+  const st = $("manualStatus");
+  const tipo = $("manualTipo").value;
+  const banco = $("manualBanco").value;
+  const esCheque = tipo !== "Transferencia";
+  const tipoCheque = tipo === "Cheque emitido" ? "Emitido" : tipo === "Cheque de terceros" ? "De terceros" : null;
+
+  const contenedor = esCheque ? $("manualCamposCheque") : $("manualCamposTransferencia");
+  const lookup = {};
+  contenedor.querySelectorAll("[data-campo]").forEach(input => { lookup[input.dataset.campo] = input.value.trim(); });
+
+  if (!lookup["Importe"]) {
+    setStatus(st, "Completá al menos el importe.", "msg-error");
+    return;
+  }
+  if (esCheque && !lookup["N° de Cheque"]) {
+    setStatus(st, "Completá el N° de Cheque.", "msg-error");
+    return;
+  }
+
+  const headers = esCheque ? HEADERS_CHEQUES : HEADERS_TRANSFERENCIAS;
+  const rFalso = {
+    filename: "Carga manual",
+    banco,
+    tipoCheque,
+    parsed: Object.entries(lookup).map(([Campo, Valor]) => ({ Campo, Valor }))
+  };
+  const fila = filaDesde(rFalso, headers);
+
+  $("modalManualGuardar").disabled = true;
+  setStatus(st, "Guardando…");
+  try {
+    const res = await runAsync(esCheque ? "guardarCheques" : "guardarComprobantes", [fila]);
+    if (res.agregadas) {
+      setStatus(st, "Guardado.", "msg-ok");
+      limpiarCamposManual();
+      if (esCheque) {
+        chequesCargados = false;
+        if ($("vista-cheques").classList.contains("active")) cargarCheques(true);
+      } else {
+        transferenciasCargadas = false;
+        if ($("vista-transferencias").classList.contains("active")) cargarTransferencias(true);
+      }
+      setTimeout(cerrarModalManual, 900);
+    } else {
+      setStatus(st, "No se guardó: ya existía un registro con esos mismos datos.", "msg-error");
+    }
+  } catch (err) {
+    setStatus(st, "Error al guardar: " + (err && err.message ? err.message : err), "msg-error");
+  } finally {
+    $("modalManualGuardar").disabled = false;
+  }
 });
 
 // ---------------- Vista: Transferencias (agrupadas por banco y destinatario) ----------------
