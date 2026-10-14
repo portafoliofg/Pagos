@@ -320,6 +320,37 @@
           <button id="btnRefrescarTransferencias" class="secondary" type="button">Actualizar</button>
         </div>
       </div>
+      <div class="card filtros-card">
+        <div class="row">
+          <label>Banco
+            <select id="filtro-transferencias-banco">
+              <option value="">Todos</option>
+              <option>BBVA</option>
+              <option>Bancor</option>
+            </select>
+          </label>
+          <label>Buscar (referencia, persona o empresa)
+            <input type="text" id="filtro-transferencias-texto" placeholder="Ej: Ferretería, 30-12345678-9, 111...">
+          </label>
+        </div>
+        <div class="row">
+          <label>Fecha desde
+            <input type="date" id="filtro-transferencias-desde">
+          </label>
+          <label>Fecha hasta
+            <input type="date" id="filtro-transferencias-hasta">
+          </label>
+          <label>Importe mínimo
+            <input type="number" id="filtro-transferencias-importeMin" placeholder="0">
+          </label>
+          <label>Importe máximo
+            <input type="number" id="filtro-transferencias-importeMax" placeholder="Sin límite">
+          </label>
+        </div>
+        <div class="actions" style="margin-top:10px">
+          <button class="secondary" id="btnLimpiarFiltroTransferencias" type="button">Limpiar filtros</button>
+        </div>
+      </div>
       <div id="transferenciasBox"></div>
     </section>
 
@@ -333,6 +364,37 @@
         <div class="actions" style="margin-top:0">
           <button class="secondary btn-entrada-manual" data-tipo-default="Cheque emitido" type="button">Entrada manual</button>
           <button id="btnRefrescarCheques" class="secondary" type="button">Actualizar</button>
+        </div>
+      </div>
+      <div class="card filtros-card">
+        <div class="row">
+          <label>Banco
+            <select id="filtro-cheques-banco">
+              <option value="">Todos</option>
+              <option>BBVA</option>
+              <option>Bancor</option>
+            </select>
+          </label>
+          <label>Buscar (N° de cheque, persona o empresa)
+            <input type="text" id="filtro-cheques-texto" placeholder="Ej: Distribuidora, 00012345...">
+          </label>
+        </div>
+        <div class="row">
+          <label>Fecha de pago desde
+            <input type="date" id="filtro-cheques-desde">
+          </label>
+          <label>Fecha de pago hasta
+            <input type="date" id="filtro-cheques-hasta">
+          </label>
+          <label>Importe mínimo
+            <input type="number" id="filtro-cheques-importeMin" placeholder="0">
+          </label>
+          <label>Importe máximo
+            <input type="number" id="filtro-cheques-importeMax" placeholder="Sin límite">
+          </label>
+        </div>
+        <div class="actions" style="margin-top:10px">
+          <button class="secondary" id="btnLimpiarFiltroCheques" type="button">Limpiar filtros</button>
         </div>
       </div>
       <div id="chequesBox"></div>
@@ -958,9 +1020,79 @@ $("modalManualGuardar").addEventListener("click", async () => {
   }
 });
 
+// ---------------- Filtros (Transferencias / Cheques) ----------------
+// Convierte "dd/mm/aaaa" a "aaaa-mm-dd" para poder ordenar y comparar
+// fechas correctamente (como texto, "01/12/2026" queda antes que
+// "15/01/2026" aunque cronológicamente sea al revés).
+function fechaAOrden(str) {
+  const partes = String(str || "").trim().split("/");
+  if (partes.length !== 3) return "";
+  const [d, m, y] = partes;
+  if (!d || !m || !y) return "";
+  return y.padStart(4, "0") + "-" + m.padStart(2, "0") + "-" + d.padStart(2, "0");
+}
+
+function ordenarPorFecha(filas, campoFecha) {
+  return filas.slice().sort((a, b) => fechaAOrden(a[campoFecha]).localeCompare(fechaAOrden(b[campoFecha])));
+}
+
+function leerFiltros(prefijo) {
+  const importeMinTxt = $(`filtro-${prefijo}-importeMin`).value;
+  const importeMaxTxt = $(`filtro-${prefijo}-importeMax`).value;
+  return {
+    banco: $(`filtro-${prefijo}-banco`).value,
+    texto: $(`filtro-${prefijo}-texto`).value.trim().toLowerCase(),
+    desde: $(`filtro-${prefijo}-desde`).value,  // yyyy-mm-dd o ""
+    hasta: $(`filtro-${prefijo}-hasta`).value,
+    importeMin: importeMinTxt === "" ? null : parseFloat(importeMinTxt),
+    importeMax: importeMaxTxt === "" ? null : parseFloat(importeMaxTxt)
+  };
+}
+
+function cumpleFiltro(fila, filtro, camposTexto, campoFecha) {
+  if (filtro.banco && (fila["Banco"] || "") !== filtro.banco) return false;
+
+  if (filtro.texto) {
+    const coincide = camposTexto.some(c => (fila[c] || "").toLowerCase().includes(filtro.texto));
+    if (!coincide) return false;
+  }
+
+  if (filtro.desde || filtro.hasta) {
+    const fechaOrden = fechaAOrden(fila[campoFecha]);
+    if (!fechaOrden) return false;
+    if (filtro.desde && fechaOrden < filtro.desde) return false;
+    if (filtro.hasta && fechaOrden > filtro.hasta) return false;
+  }
+
+  if (filtro.importeMin !== null || filtro.importeMax !== null) {
+    const importe = parseImporte(fila["Importe"]);
+    if (filtro.importeMin !== null && importe < filtro.importeMin) return false;
+    if (filtro.importeMax !== null && importe > filtro.importeMax) return false;
+  }
+
+  return true;
+}
+
+function limpiarFiltros(prefijo) {
+  $(`filtro-${prefijo}-banco`).value = "";
+  $(`filtro-${prefijo}-texto`).value = "";
+  $(`filtro-${prefijo}-desde`).value = "";
+  $(`filtro-${prefijo}-hasta`).value = "";
+  $(`filtro-${prefijo}-importeMin`).value = "";
+  $(`filtro-${prefijo}-importeMax`).value = "";
+}
+
 // ---------------- Vista: Transferencias (agrupadas por banco y destinatario) ----------------
 let transferenciasCargadas = false;
+let transferenciasDatos = [];
 
+["banco", "texto", "desde", "hasta", "importeMin", "importeMax"].forEach(campo => {
+  $(`filtro-transferencias-${campo}`).addEventListener("input", aplicarFiltrosTransferencias);
+});
+$("btnLimpiarFiltroTransferencias").addEventListener("click", () => {
+  limpiarFiltros("transferencias");
+  aplicarFiltrosTransferencias();
+});
 $("btnRefrescarTransferencias").addEventListener("click", () => cargarTransferencias(true));
 
 function cargarTransferencias(forzar) {
@@ -970,7 +1102,8 @@ function cargarTransferencias(forzar) {
   google.script.run
     .withSuccessHandler(filas => {
       transferenciasCargadas = true;
-      renderTransferencias(filas);
+      transferenciasDatos = filas;
+      aplicarFiltrosTransferencias();
     })
     .withFailureHandler(err => {
       box.replaceChildren(nodoError("No se pudieron traer las transferencias: " + (err && err.message ? err.message : err)));
@@ -978,11 +1111,19 @@ function cargarTransferencias(forzar) {
     .obtenerTransferencias();
 }
 
+function aplicarFiltrosTransferencias() {
+  const filtro = leerFiltros("transferencias");
+  const filtradas = transferenciasDatos.filter(f =>
+    cumpleFiltro(f, filtro, ["N° de Referencia", "Titular Origen", "Titular Destino"], "Fecha")
+  );
+  renderTransferencias(filtradas);
+}
+
 function renderTransferencias(filas) {
   const box = $("transferenciasBox");
   box.replaceChildren();
   if (!filas.length) {
-    box.append(nodoVacio("Todavía no hay transferencias guardadas."));
+    box.append(nodoVacio(transferenciasDatos.length ? "Ninguna transferencia coincide con el filtro." : "Todavía no hay transferencias guardadas."));
     return;
   }
 
@@ -1001,7 +1142,7 @@ function renderTransferencias(filas) {
 
     const porDestinatario = agruparPor(filasBanco, "Titular Destino");
     Object.keys(porDestinatario).sort().forEach(destinatario => {
-      const filasDest = porDestinatario[destinatario].slice().sort((a, b) => (a["Fecha"] || "").localeCompare(b["Fecha"] || ""));
+      const filasDest = ordenarPorFecha(porDestinatario[destinatario], "Fecha");
       const totalDest = filasDest.reduce((acc, f) => acc + parseImporte(f["Importe"]), 0);
 
       const sub = document.createElement("div");
@@ -1032,7 +1173,15 @@ function renderTransferencias(filas) {
 
 // ---------------- Vista: Cheques (agrupados por banco y tipo) ----------------
 let chequesCargados = false;
+let chequesDatos = [];
 
+["banco", "texto", "desde", "hasta", "importeMin", "importeMax"].forEach(campo => {
+  $(`filtro-cheques-${campo}`).addEventListener("input", aplicarFiltrosCheques);
+});
+$("btnLimpiarFiltroCheques").addEventListener("click", () => {
+  limpiarFiltros("cheques");
+  aplicarFiltrosCheques();
+});
 $("btnRefrescarCheques").addEventListener("click", () => cargarCheques(true));
 
 function cargarCheques(forzar) {
@@ -1042,7 +1191,8 @@ function cargarCheques(forzar) {
   google.script.run
     .withSuccessHandler(filas => {
       chequesCargados = true;
-      renderCheques(filas);
+      chequesDatos = filas;
+      aplicarFiltrosCheques();
     })
     .withFailureHandler(err => {
       box.replaceChildren(nodoError("No se pudieron traer los cheques: " + (err && err.message ? err.message : err)));
@@ -1050,11 +1200,19 @@ function cargarCheques(forzar) {
     .obtenerCheques();
 }
 
+function aplicarFiltrosCheques() {
+  const filtro = leerFiltros("cheques");
+  const filtradas = chequesDatos.filter(f =>
+    cumpleFiltro(f, filtro, ["N° de Cheque", "Titular"], "Fecha de Pago")
+  );
+  renderCheques(filtradas);
+}
+
 function renderCheques(filas) {
   const box = $("chequesBox");
   box.replaceChildren();
   if (!filas.length) {
-    box.append(nodoVacio("Todavía no hay cheques guardados."));
+    box.append(nodoVacio(chequesDatos.length ? "Ningún cheque coincide con el filtro." : "Todavía no hay cheques guardados."));
     return;
   }
 
@@ -1072,7 +1230,7 @@ function renderCheques(filas) {
 
     const porTipo = agruparPor(filasBanco, "Tipo");
     Object.keys(porTipo).sort().forEach(tipo => {
-      const filasTipo = porTipo[tipo].slice().sort((a, b) => (a["Fecha de Pago"] || "").localeCompare(b["Fecha de Pago"] || ""));
+      const filasTipo = ordenarPorFecha(porTipo[tipo], "Fecha de Pago");
       const totalTipo = filasTipo.reduce((acc, f) => acc + parseImporte(f["Importe"]), 0);
 
       const sub = document.createElement("div");
